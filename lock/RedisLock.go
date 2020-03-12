@@ -1,29 +1,18 @@
 package lock
 
 import (
+	"strconv"
+	"time"
 
-	// cerr "github.com/pip-services3-go/pip-services3-commons-go/errors"
+	"github.com/gomodule/redigo/redis"
 	cconf "github.com/pip-services3-go/pip-services3-commons-go/config"
 	cdata "github.com/pip-services3-go/pip-services3-commons-go/data"
+	cerr "github.com/pip-services3-go/pip-services3-commons-go/errors"
 	cref "github.com/pip-services3-go/pip-services3-commons-go/refer"
 	cauth "github.com/pip-services3-go/pip-services3-components-go/auth"
 	ccon "github.com/pip-services3-go/pip-services3-components-go/connect"
 	clock "github.com/pip-services3-go/pip-services3-components-go/lock"
 )
-
-// import { ConfigParams } from "pip-services3-commons-node";
-// import { IConfigurable } from "pip-services3-commons-node";
-// import { IReferences } from "pip-services3-commons-node";
-// import { IReferenceable } from "pip-services3-commons-node";
-// import { IOpenable } from "pip-services3-commons-node";
-// import { IdGenerator } from "pip-services3-commons-node";
-// import { InvalidStateException } from "pip-services3-commons-node";
-// import { ConfigException } from "pip-services3-commons-node";
-// import { ConnectionParams } from "pip-services3-components-node";
-// import { ConnectionResolver } from "pip-services3-components-node";
-// import { CredentialParams } from "pip-services3-components-node";
-// import { CredentialResolver } from "pip-services3-components-node";
-// import { Lock } from "pip-services3-components-node";
 
 /*
 RedisLock are distributed lock that is implemented based on Redis in-memory database.
@@ -37,11 +26,12 @@ Configuration parameters:
   - uri:                   resource URI or connection string with all parameters in it
 - credential(s):
   - store_key:             key to retrieve parameters from credential store
-  - username:              user name (currently is not used)
+  //- username:              user name (currently is not used)
   - password:              user password
 - options:
   - retrytimeout:         timeout in milliseconds to retry lock acquisition. (Default: 100)
-  - retries:               number of retries (default: 3)
+  //- retries:               number of retries (default: 3)
+  - db_num:                database number in Redis  (default 0)
 
 References:
 
@@ -50,66 +40,68 @@ References:
 
 Example:
 
-    let lock = new RedisRedis();
-    lock.configure(ConfigParams.fromTuples(
+    lock = NewRedisRedis();
+    lock.Configure(cconf.NewConfigParamsFromTuples(
       "host", "localhost",
-      "port", 6379
+      "port", 6379,
     ));
 
-    lock.open("123", (err) => {
+    err = lock.Open("123")
       ...
-    });
 
-    lock.acquire("123", "key1", (err) => {
-         if (err == null) {
-             try {
-               // Processing...
-             } finally {
-                lock.releaseLock("123", "key1", (err) => {
-                    // Continue...
-                });
-             }
-         }
-    });
+    result, err := lock.TryAcquireLock("123", "key1", 3000)
+	if result {
+		// Processing...
+	}
+	err = lock.ReleaseLock("123", "key1")
+	// Continue...
 */
 type RedisLock struct {
 	*clock.Lock
 	connectionResolver *ccon.ConnectionResolver
 	credentialResolver *cauth.CredentialResolver
 
-	lock    string
+	lockId  string
 	timeout int
-	retries int
+	//retries int
+	dbNum int
 
-	client interface{}
+	client redis.Conn
 }
 
 // NewRedisLock method are creates a new instance of this lock.
 func NewRedisLock() *RedisLock {
-	c := RedisLock{}
-	c.connectionResolver = ccon.NewEmptyConnectionResolver()
-	c.credentialResolver = cauth.NewEmptyCredentialResolver()
-
-	c.lock = cdata.IdGenerator.NextLong()
-	c.timeout = 30000
-	c.retries = 3
-
-	c.client = nil
+	c := RedisLock{
+		connectionResolver: ccon.NewEmptyConnectionResolver(),
+		credentialResolver: cauth.NewEmptyCredentialResolver(),
+		lockId:             cdata.IdGenerator.NextLong(),
+		timeout:            30000,
+		//retries : 3,
+		dbNum:  0,
+		client: nil,
+	}
+	c.Lock = clock.InheritLock(&c)
 	return &c
 }
 
-//   Configure method are configures component by passing configuration parameters.
+// Configure method are configures component by passing configuration parameters.
+// Parameters:
 //   - config    configuration parameters to be set.
 func (c *RedisLock) Configure(config *cconf.ConfigParams) {
 	c.connectionResolver.Configure(config)
 	c.credentialResolver.Configure(config)
 
 	c.timeout = config.GetAsIntegerWithDefault("options.timeout", c.timeout)
-	c.retries = config.GetAsIntegerWithDefault("options.retries", c.retries)
+	//c.retries = config.GetAsIntegerWithDefault("options.retries", c.retries)
+	c.dbNum = config.GetAsIntegerWithDefault("options.db_num", c.dbNum)
+	if c.dbNum > 15 || c.dbNum < 0 {
+		c.dbNum = 0
+	}
 }
 
 // SetReferences method are sets references to dependent components.
-// - references 	references to locate the component dependencies.
+// Parameters:
+//   - references 	references to locate the component dependencies.
 func (c *RedisLock) SetReferences(references cref.IReferences) {
 	c.connectionResolver.SetReferences(references)
 	c.credentialResolver.SetReferences(references)
@@ -121,157 +113,128 @@ func (c *RedisLock) IsOpen() bool {
 	return c.client != nil
 }
 
-//     /**
-// 	Opens the component.
-// 	 *
+// Open method are opens the component.
+// Parameters:
 // 	- correlationId 	(optional) transaction id to trace execution through call chain.
-//     - callback 			callback function that receives error or null no errors occured.
-//      */
-//     func (c*RedisLock) open(correlationId: string, callback: (err: any) => void) {
-//         let connection: ConnectionParams;
-//         let credential: CredentialParams;
+// Returns: error or nil no errors occured.
+func (c *RedisLock) Open(correlationId string) error {
+	var connection *ccon.ConnectionParams
+	var credential *cauth.CredentialParams
 
-//         async.series([
-//             (callback) => {
-//                 c.connectionResolver.resolve(correlationId, (err, result) => {
-//                     connection = result;
-//                     if (err == null && connection == null)
-//                         err = new ConfigException(correlationId, "NO_CONNECTION", "Connection is not configured");
-//                     callback(err);
-//                 });
-//             },
-//             (callback) => {
-//                 c.credentialResolver.lookup(correlationId, (err, result) => {
-//                     credential = result;
-//                     callback(err);
-//                 });
-//             },
-//             (callback) => {
-//                 let options: any = {
-//                     // connecttimeout: c.timeout,
-//                     // max_attempts: c.retries,
-//                     retry_strategy: (options) => { return c.retryStrategy(options); }
-//                 };
+	connection, err := c.connectionResolver.Resolve(correlationId)
 
-//                 if (connection.getUri() != null) {
-//                     options.url = connection.getUri();
-//                 } else {
-//                     options.host = connection.getHost() || "localhost";
-//                     options.port = connection.getPort() || 6379;
-//                 }
+	if err == nil && connection == nil {
+		err = cerr.NewConfigError(correlationId, "NO_CONNECTION", "Connection is not configured")
+		return err
+	}
 
-//                 if (credential != null) {
-//                     options.password = credential.getPassword();
-//                 }
+	credential, err = c.credentialResolver.Lookup(correlationId)
+	if err != nil {
+		return err
+	}
 
-//                 let redis = require("redis");
-//                 c.client = redis.createClient(options);
+	var url, host, port, password string
+	var dialOpts []redis.DialOption = make([]redis.DialOption, 0)
 
-//                 if (callback) callback(null);
-//             }
-//         ], callback);
-//     }
+	dialOpts = append(dialOpts, redis.DialConnectTimeout(time.Duration(c.timeout)*time.Millisecond))
+	dialOpts = append(dialOpts, redis.DialDatabase(c.dbNum))
 
-//     /**
-// 	Closes component and frees used resources.
-// 	 *
-// 	- correlationId 	(optional) transaction id to trace execution through call chain.
-//     - callback 			callback function that receives error or null no errors occured.
-//      */
-//     func (c*RedisLock) close(correlationId: string, callback: (err: any) => void) {
-//         if (c.client != null) {
-//             c.client.quit(((err) => {
-//                 c.client = null;
-//                 if (callback) callback(err);
-//             }));
-//         } else {
-//             if (callback) callback(null);
-//         }
-//     }
+	if credential != nil {
+		password = credential.Password()
+		dialOpts = append(dialOpts, redis.DialPassword(password))
+	}
 
-//     private checkOpened(correlationId: string, callback: any): boolean {
-//         if (!c.isOpen()) {
-//             let err = new InvalidStateException(correlationId, "NOT_OPENED", "Connection is not opened");
-//             callback(err, null);
-//             return false;
-//         }
+	if connection.Uri() != "" {
+		url = connection.Uri()
+		c.client, err = redis.DialURL(url, dialOpts...)
+	} else {
+		host = connection.Host()
+		if host == "" {
+			host = "localhost"
+		}
+		port = strconv.FormatInt(int64(connection.Port()), 10)
+		if port == "0" {
+			port = "6379"
+		}
+		url = host + ":" + port
+		c.client, err = redis.Dial("tcp", url, dialOpts...)
+	}
+	return err
+}
 
-//         return true;
-//     }
+// Close method are closes component and frees used resources.
+// Parameters:
+//  - correlationId 	(optional) transaction id to trace execution through call chain.
+// Retruns: error or nil no errors occured.
+func (c *RedisLock) Close(correlationId string) error {
+	if c.client != nil {
+		err := c.client.Close()
+		c.client = nil
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-//     private retryStrategy(options: any): any {
-//         if (options.error && options.error.code === "ECONNREFUSED") {
-//             // End reconnecting on a specific error and flush all commands with
-//             // a individual error
-//             return new Error("The server refused the connection");
-//         }
-//         if (options.total_retry_time > c.timeout) {
-//             // End reconnecting after a specific timeout and flush all commands
-//             // with a individual error
-//             return new Error("Retry time exhausted");
-//         }
-//         if (options.attempt > c.retries) {
-//             // End reconnecting with built in error
-//             return undefined;
-//         }
-//         // reconnect after
-//         return Math.min(options.attempt100, 3000);
-//     }
+func (c *RedisLock) checkOpened(correlationId string) (state bool, err error) {
+	if !c.IsOpen() {
+		err = cerr.NewInvalidStateError(correlationId, "NOT_OPENED", "Connection is not opened")
+		return false, err
+	}
 
-//     /**
-//     Makes a single attempt to acquire a lock by its key.
-//     It returns immediately a positive or negative result.
-//      *
-//     - correlationId     (optional) transaction id to trace execution through call chain.
-//     - key               a unique lock key to acquire.
-//     - ttl               a lock timeout (time to live) in milliseconds.
-//     - callback          callback function that receives a lock result or error.
-//      */
-//     func (c*RedisLock) tryAcquireLock(correlationId: string, key: string, ttl: number,
-//         callback: (err: any, result: boolean) => void) {
-//         if (!c.checkOpened(correlationId, callback)) return;
+	return true, nil
+}
 
-//         c.client.set(key, c.lock, "NX", "PX", ttl, (err, result) => {
-//             callback(err, result == "OK");
-//         });
-//     }
+// TryAcquireLock method are makes a single attempt to acquire a lock by its key.
+// It returns immediately a positive or negative result.
+// Parameters:
+//  - correlationId     (optional) transaction id to trace execution through call chain.
+//  - key               a unique lock key to acquire.
+//  - ttl               a lock timeout (time to live) in milliseconds.
+// Returns: a lock result or error.
+func (c *RedisLock) TryAcquireLock(correlationId string, key string, ttl int64) (result bool, err error) {
+	state, err := c.checkOpened(correlationId)
+	if !state {
+		return false, err
+	}
 
-//     /**
-//     Releases prevously acquired lock by its key.
-//      *
-//     - correlationId     (optional) transaction id to trace execution through call chain.
-//     - key               a unique lock key to release.
-//     - callback          callback function that receives error or null for success.
-//      */
-//     func (c*RedisLock) releaseLock(correlationId: string, key: string,
-//         callback?: (err: any) => void) {
-//         if (!c.checkOpened(correlationId, callback)) return;
+	res, err := redis.String(c.client.Do("SET", key, c.lockId, "NX", "PX", ttl))
+	if err != nil && err == redis.ErrNil {
+		return false, nil
+	}
+	return res == "OK", err
+}
 
-//         // Start transaction on key
-//         c.client.watch(key, (err) => {
-//             if (err) {
-//                 if (callback) callback(err);
-//                 return;
-//             }
+// ReleaseLock method are releases prevously acquired lock by its key.
+//  - correlationId     (optional) transaction id to trace execution through call chain.
+//  - key               a unique lock key to release.
+// Returns: error or nil for success.
+func (c *RedisLock) ReleaseLock(correlationId string, key string) error {
+	state, err := c.checkOpened(correlationId)
+	if !state {
+		return err
+	}
 
-//             // Read and check if lock is the same
-//             c.client.get(key, (err, result) => {
-//                 if (err) {
-//                     if (callback) callback(err);
-//                     return;
-//                 }
+	// Start transaction on key
+	_, err = c.client.Do("WATCH", key)
+	if err != nil {
+		return err
+	}
 
-//                 // Remove the lock if it matches
-//                 if (result == c.lock) {
-//                     c.client.multi()
-//                         .del(key)
-//                         .exec(callback);
-//                 }
-//                 // Cancel transaction if it doesn"t match
-//                 else {
-//                     c.client.unwatch(callback);
-//                 }
-//             })
-//         });
-//     }
-// }
+	// Read and check if lock is the same
+	keyId, err := redis.String(c.client.Do("GET", key))
+	if err != nil && err != redis.ErrNil {
+		c.client.Do("UNWATCH")
+		return err
+	}
+	// Remove the lock if it matches
+	if keyId == c.lockId {
+		c.client.Send("MULTI")
+		c.client.Send("DEL", key)
+		_, err = c.client.Do("EXEC")
+	} else { // Cancel transaction if it doesn"t match
+		_, err = c.client.Do("UNWATCH")
+	}
+	return err
+}

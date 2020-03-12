@@ -1,25 +1,17 @@
 package cache
 
 import (
+	"strconv"
+	"time"
+
 	cconf "github.com/pip-services3-go/pip-services3-commons-go/config"
-	// cerr "github.com/pip-services3-go/pip-services3-commons-go/errors"
+	cerr "github.com/pip-services3-go/pip-services3-commons-go/errors"
 	cref "github.com/pip-services3-go/pip-services3-commons-go/refer"
 	cauth "github.com/pip-services3-go/pip-services3-components-go/auth"
 	ccon "github.com/pip-services3-go/pip-services3-components-go/connect"
-)
 
-// import { ConfigParams } from "pip-services3-commons-node";
-// import { IConfigurable } from "pip-services3-commons-node";
-// import { IReferences } from "pip-services3-commons-node";
-// import { IReferenceable } from "pip-services3-commons-node";
-// import { IOpenable } from "pip-services3-commons-node";
-// import { InvalidStateException } from "pip-services3-commons-node";
-// import { ConfigException } from "pip-services3-commons-node";
-// import { ConnectionParams } from "pip-services3-components-node";
-// import { ConnectionResolver } from "pip-services3-components-node";
-// import { CredentialParams } from "pip-services3-components-node";
-// import { CredentialResolver } from "pip-services3-components-node";
-// import { ICache } from "pip-services3-components-node";
+	redis "github.com/gomodule/redigo/redis"
+)
 
 /*
 Distributed cache that stores values in Redis in-memory database.
@@ -33,12 +25,13 @@ Configuration parameters:
   - uri:                   resource URI or connection string with all parameters in it
 - credential(s):
   - store_key:             key to retrieve parameters from credential store
-  - username:              user name (currently is not used)
+  //- username:              user name (currently is not used)
   - password:              user password
 - options:
-  - retries:               number of retries (default: 3)
+  //- retries:               number of retries (default: 3)
   - timeout:               default caching timeout in milliseconds (default: 1 minute)
-  - max_size:              maximum number of values stored in this cache (default: 1000)
+  - db_num:                database number in Redis  (default 0)
+  //- max_size:            maximum number of values stored in this cache (default: 1000)
 
 References:
 
@@ -47,21 +40,23 @@ References:
 
 Example:
 
-    let cache = new RedisCache();
-    cache.configure(ConfigParams.fromTuples(
+    cache = NewRedisCache();
+    cache.Configure(cconf.NewConfigParamsFromTuples(
       "host", "localhost",
-      "port", 6379
+      "port", 6379,
     ));
 
-    cache.open("123", (err) => {
+    err = cache.Open("123")
       ...
-    });
 
-    cache.store("123", "key1", "ABC", (err) => {
-         cache.store("123", "key1", (err, value) => {
-             // Result: "ABC"
-         });
-    });
+    ret, err := cache.Store("123", "key1", []byte("ABC"))
+	if err != nil {
+		...
+	}
+
+	res, err := cache.Retrive("123", "key1")
+	value, _ := res.([]byte)
+    fmt.Println(string(value))     // Result: "ABC"
 */
 
 type RedisCache struct {
@@ -69,9 +64,10 @@ type RedisCache struct {
 	credentialResolver *cauth.CredentialResolver
 
 	timeout int
-	retries int
+	//retries int
+	dbNum int
 
-	client interface{}
+	client redis.Conn
 }
 
 // NewRedisCache method are creates a new instance of this cache.
@@ -80,7 +76,8 @@ func NewRedisCache() *RedisCache {
 	c.connectionResolver = ccon.NewEmptyConnectionResolver()
 	c.credentialResolver = cauth.NewEmptyCredentialResolver()
 	c.timeout = 30000
-	c.retries = 3
+	//c.retries = 3
+	c.dbNum = 0
 	return &c
 }
 
@@ -91,7 +88,11 @@ func (c *RedisCache) Configure(config *cconf.ConfigParams) {
 	c.credentialResolver.Configure(config)
 
 	c.timeout = config.GetAsIntegerWithDefault("options.timeout", c.timeout)
-	c.retries = config.GetAsIntegerWithDefault("options.retries", c.retries)
+	//c.retries = config.GetAsIntegerWithDefault("options.retries", c.retries)
+	c.dbNum = config.GetAsIntegerWithDefault("options.db_num", c.dbNum)
+	if c.dbNum > 15 || c.dbNum < 0 {
+		c.dbNum = 0
+	}
 }
 
 // Sets references to dependent components.
@@ -107,146 +108,119 @@ func (c *RedisCache) IsOpen() bool {
 	return c.client != nil
 }
 
-//     /*
-// 	Opens the component.
-// 	 *
-// 	- correlationId 	(optional) transaction id to trace execution through call chain.
-//     - callback 			callback function that receives error or null no errors occured.
-//      */
-//     func (c* RedisCache) open(correlationId: string, callback: (err: any) => void) {
-//         let connection: ConnectionParams;
-//         let credential: CredentialParams;
+// Open method are opens the component.
+// Parameters:
+//  - correlationId 	(optional) transaction id to trace execution through call chain.
+// Returns: error or nil no errors occured.
+func (c *RedisCache) Open(correlationId string) error {
+	var connection *ccon.ConnectionParams
+	var credential *cauth.CredentialParams
 
-//         async.series([
-//             (callback) => {
-//                 c.connectionResolver.resolve(correlationId, (err, result) => {
-//                     connection = result;
-//                     if (err == null && connection == null)
-//                         err = new ConfigException(correlationId, "NO_CONNECTION", "Connection is not configured");
-//                     callback(err);
-//                 });
-//             },
-//             (callback) => {
-//                 c.credentialResolver.lookup(correlationId, (err, result) => {
-//                     credential = result;
-//                     callback(err);
-//                 });
-//             },
-//             (callback) => {
-//                 let options: any = {
-//                     // connecttimeout: c.timeout,
-//                     // max_attempts: c.retries,
-//                     retry_strategy: (options) => { return c.retryStrategy(options); }
-//                 };
+	connection, err := c.connectionResolver.Resolve(correlationId)
 
-//                 if (connection.getUri() != null) {
-//                     options.url = connection.getUri();
-//                 } else {
-//                     options.host = connection.getHost() || "localhost";
-//                     options.port = connection.getPort() || 6379;
-//                 }
+	if err == nil && connection == nil {
+		err = cerr.NewConfigError(correlationId, "NO_CONNECTION", "Connection is not configured")
+		return err
+	}
 
-//                 if (credential != null) {
-//                     options.password = credential.getPassword();
-//                 }
+	credential, err = c.credentialResolver.Lookup(correlationId)
+	if err != nil {
+		return err
+	}
 
-//                 let redis = require("redis");
-//                 c.client = redis.createClient(options);
+	var url, host, port, password string
+	var dialOpts []redis.DialOption = make([]redis.DialOption, 0)
 
-//                 if (callback) callback(null);
-//             }
-//         ], callback);
-//     }
+	dialOpts = append(dialOpts, redis.DialConnectTimeout(time.Duration(c.timeout)*time.Millisecond))
+	dialOpts = append(dialOpts, redis.DialDatabase(c.dbNum))
 
-//     /*
-// 	Closes component and frees used resources.
-// 	 *
-// 	- correlationId 	(optional) transaction id to trace execution through call chain.
-//     - callback 			callback function that receives error or null no errors occured.
-//      */
-//     func (c* RedisCache) close(correlationId: string, callback: (err: any) => void) {
-//         if (c.client != null) {
-//             c.client.quit(((err) => {
-//                 c.client = null;
-//                 if (callback) callback(err);
-//             }));
-//         } else {
-//             if (callback) callback(null);
-//         }
-//     }
+	if credential != nil {
+		password = credential.Password()
+		dialOpts = append(dialOpts, redis.DialPassword(password))
+	}
 
-//     private checkOpened(correlationId: string, callback: any): boolean {
-//         if (!c.isOpen()) {
-//             let err = new InvalidStateException(correlationId, "NOT_OPENED", "Connection is not opened");
-//             callback(err, null);
-//             return false;
-//         }
+	if connection.Uri() != "" {
+		url = connection.Uri()
+		c.client, err = redis.DialURL(url, dialOpts...)
+	} else {
+		host = connection.Host()
+		if host == "" {
+			host = "localhost"
+		}
+		port = strconv.FormatInt(int64(connection.Port()), 10)
+		if port == "0" {
+			port = "6379"
+		}
+		url = host + ":" + port
+		c.client, err = redis.Dial("tcp", url, dialOpts...)
+	}
+	return err
+}
 
-//         return true;
-//     }
+// Close method are closes component and frees used resources.
+// Parameters:
+//   - correlationId 	(optional) transaction id to trace execution through call chain.
+// Retruns: error or nil no errors occured.
+func (c *RedisCache) Close(correlationId string) error {
+	if c.client != nil {
+		err := c.client.Close()
+		c.client = nil
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-//     private retryStrategy(options: any): any {
-//         if (options.error && options.error.code === "ECONNREFUSED") {
-//             // End reconnecting on a specific error and flush all commands with
-//             // a individual error
-//             return new Error("The server refused the connection");
-//         }
-//         if (options.total_retry_time > c.timeout) {
-//             // End reconnecting after a specific timeout and flush all commands
-//             // with a individual error
-//             return new Error("Retry time exhausted");
-//         }
-//         if (options.attempt > c.retries) {
-//             // End reconnecting with built in error
-//             return undefined;
-//         }
-//         // reconnect after
-//         return Math.min(options.attempt100, 3000);
-//     }
+func (c *RedisCache) checkOpened(correlationId string) (state bool, err error) {
+	if !c.IsOpen() {
+		err = cerr.NewInvalidStateError(correlationId, "NOT_OPENED", "Connection is not opened")
+		return false, err
+	}
 
-//     /*
-//     Retrieves cached value from the cache using its key.
-//     If value is missing in the cache or expired it returns null.
-//      *
-//     - correlationId     (optional) transaction id to trace execution through call chain.
-//     - key               a unique value key.
-//     - callback          callback function that receives cached value or error.
-//      */
-//     func (c* RedisCache) retrieve(correlationId: string, key: string,
-//         callback: (err: any, value: any) => void) {
-//         if (!c.checkOpened(correlationId, callback)) return;
+	return true, nil
+}
 
-//         c.client.get(key, callback);
-//     }
+// Retrieve method are retrieves cached value from the cache using its key.
+// If value is missing in the cache or expired it returns nil.
+// Parameters:
+//  - correlationId     (optional) transaction id to trace execution through call chain.
+//  - key               a unique value key.
+//  Retruns: cached value or error.
+func (c *RedisCache) Retrieve(correlationId string, key string) (value interface{}, err error) {
+	state, err := c.checkOpened(correlationId)
+	if !state {
+		return nil, err
+	}
+	return c.client.Do("GET", key)
+}
 
-//     /*
-//     Stores value in the cache with expiration time.
-//      *
-//     - correlationId     (optional) transaction id to trace execution through call chain.
-//     - key               a unique value key.
-//     - value             a value to store.
-//     - timeout           expiration timeout in milliseconds.
-//     - callback          (optional) callback function that receives an error or null for success
-//      */
-//     func (c* RedisCache) store(correlationId: string, key: string, value: any, timeout: number,
-//         callback: (err: any) => void) {
-//         if (!c.checkOpened(correlationId, callback)) return;
+// Store method are stores value in the cache with expiration time.
+// Parameters:
+// - correlationId     (optional) transaction id to trace execution through call chain.
+// - key               a unique value key.
+// - value             a value to store.
+// - timeout           expiration timeout in milliseconds.
+// Retruns error or nil for success
+func (c *RedisCache) Store(correlationId string, key string, value interface{}, timeout int64) (result interface{}, err error) {
+	state, err := c.checkOpened(correlationId)
+	if !state {
+		return nil, err
+	}
 
-//         c.client.set(key, value, "PX", timeout, callback);
-//     }
+	return c.client.Do("SET", key, value, "PX", timeout)
+}
 
-//     /*
-//     Removes a value from the cache by its key.
-//      *
-//     - correlationId     (optional) transaction id to trace execution through call chain.
-//     - key               a unique value key.
-//     - callback          (optional) callback function that receives an error or null for success
-//      */
-//     func (c* RedisCache) remove(correlationId: string, key: string,
-//         callback: (err: any) => void) {
-//         if (!c.checkOpened(correlationId, callback)) return;
-
-//         c.client.del(key, callback);
-//     }
-
-// }
+// Removes a value from the cache by its key.
+// Parameters:
+// - correlationId     (optional) transaction id to trace execution through call chain.
+// - key               a unique value key.
+// Returns: error or nil for success
+func (c *RedisCache) Remove(correlationId string, key string) error {
+	state, err := c.checkOpened(correlationId)
+	if !state {
+		return err
+	}
+	_, err = c.client.Do("DEL", key)
+	return err
+}

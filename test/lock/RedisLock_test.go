@@ -1,45 +1,41 @@
 package test_lock
 
-// import { ConfigParams } from 'pip-services3-commons-node';
+import (
+	"os"
+	"testing"
 
-// import { RedisLock } from '../../src/lock/RedisLock';
-// import { LockFixture } from '../fixtures/LockFixture';
+	cconf "github.com/pip-services3-go/pip-services3-commons-go/config"
+	redislock "github.com/pip-services3-go/pip-services3-redis-go/lock"
+	redisfixture "github.com/pip-services3-go/pip-services3-redis-go/test/fixture"
+)
 
-// suite('RedisLock', ()=> {
-//     var _lock: RedisLock;
-//     var _fixture: LockFixture;
+func TestRedisLock(t *testing.T) {
+	var lock *redislock.RedisLock
+	var fixture *redisfixture.LockFixture
 
-//     setup((done) => {
-//         let host = process.env['REDIS_SERVICE_HOST'] || 'localhost';
-//         let port = process.env['REDIS_SERVICE_PORT'] || 6379;
+	host := os.Getenv("REDIS_SERVICE_HOST")
+	if host == "" {
+		host = "localhost"
+	}
 
-//         _lock = new RedisLock();
+	port := os.Getenv("REDIS_SERVICE_PORT")
+	if port == "" {
+		port = "6379"
+	}
 
-//         let config = ConfigParams.fromTuples(
-//             'connection.host', host,
-//             'connection.port', port
-//         );
-//         _lock.configure(config);
+	lock = redislock.NewRedisLock()
 
-//         _fixture = new LockFixture(_lock);
+	config := cconf.NewConfigParamsFromTuples(
+		"connection.host", host,
+		"connection.port", port,
+	)
+	lock.Configure(config)
+	fixture = redisfixture.NewLockFixture(lock)
 
-//         _lock.open(null, done);
-//     });
+	lock.Open("")
+	defer lock.Close("")
 
-//     teardown((done) => {
-//         _lock.close(null, done);
-//     });
-
-//     test('Try Acquire Lock', (done) => {
-//         _fixture.testTryAcquireLock(done);
-//     });
-
-//     test('Acquire Lock', (done) => {
-//         _fixture.testAcquireLock(done);
-//     });
-
-//     test('Release Lock', (done) => {
-//         _fixture.testReleaseLock(done);
-//     });
-
-// });
+	t.Run("Try Acquire Lock", fixture.TestTryAcquireLock)
+	t.Run("Acquire Lock", fixture.TestAcquireLock)
+	t.Run("Release Lock", fixture.TestReleaseLock)
+}
