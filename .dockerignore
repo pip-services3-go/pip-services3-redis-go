@@ -1,10 +1,6 @@
-/.vscode
-/.git
-/.gitignore
-/.dockerignore
-/doc
-/node_modules
-/doc
-/docker
-/*.sh
+/vendor
+/temp/*
+/docker/Dockerfile*
+/docker/docker-compose*.yml
 /*.ps1
+/.github

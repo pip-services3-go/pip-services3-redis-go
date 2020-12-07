@@ -15,8 +15,8 @@ COPY go.mod ./
 # Install all go_modules
 RUN go mod download
 
-# Copy the package files
+# Copy the entire project
 COPY . .
 
-# Build the project
-RUN go build -o /go/bin/run .
+# Specify the command from running tests
+CMD go test -v ./test/...
