@@ -18,20 +18,20 @@ Distributed cache that stores values in Redis in-memory database.
 
 Configuration parameters:
 
-- connection(s):
-  - discovery_key:         (optional) a key to retrieve the connection from IDiscovery
-  - host:                  host name or IP address
-  - port:                  port number
-  - uri:                   resource URI or connection string with all parameters in it
-- credential(s):
-  - store_key:             key to retrieve parameters from credential store
-  //- username:              user name (currently is not used)
-  - password:              user password
-- options:
-  //- retries:               number of retries (default: 3)
-  - timeout:               default caching timeout in milliseconds (default: 1 minute)
-  - db_num:                database number in Redis  (default 0)
-  //- max_size:            maximum number of values stored in this cache (default: 1000)
+  - connection(s):
+    - discovery_key:         (optional) a key to retrieve the connection from IDiscovery
+    - host:                  host name or IP address
+    - port:                  port number
+    - uri:                   resource URI or connection string with all parameters in it
+  - credential(s):
+    - store_key:             key to retrieve parameters from credential store
+    - username:              user name (currently is not used)
+    - password:              user password
+  - options:
+    - retries:               number of retries (default: 3)
+    - timeout:               default caching timeout in milliseconds (default: 1 minute)
+    - db_num:                database number in Redis  (default 0)
+    - max_size:            maximum number of values stored in this cache (default: 1000)
 
 References:
 
@@ -50,15 +50,14 @@ Example:
       ...
 
     ret, err := cache.Store("123", "key1", []byte("ABC"))
-	if err != nil {
-		...
-	}
+    if err != nil {
+    	...
+    }
 
-	res, err := cache.Retrive("123", "key1")
-	value, _ := res.([]byte)
+    res, err := cache.Retrive("123", "key1")
+    value, _ := res.([]byte)
     fmt.Println(string(value))     // Result: "ABC"
 */
-
 type RedisCache struct {
 	connectionResolver *ccon.ConnectionResolver
 	credentialResolver *cauth.CredentialResolver
@@ -82,7 +81,7 @@ func NewRedisCache() *RedisCache {
 }
 
 // Configure method are configures component by passing configuration parameters.
-//  - config    configuration parameters to be set.
+//   - config    configuration parameters to be set.
 func (c *RedisCache) Configure(config *cconf.ConfigParams) {
 	c.connectionResolver.Configure(config)
 	c.credentialResolver.Configure(config)
@@ -96,7 +95,7 @@ func (c *RedisCache) Configure(config *cconf.ConfigParams) {
 }
 
 // Sets references to dependent components.
-// 	- references 	references to locate the component dependencies.
+//   - references 	references to locate the component dependencies.
 func (c *RedisCache) SetReferences(references cref.IReferences) {
 	c.connectionResolver.SetReferences(references)
 	c.credentialResolver.SetReferences(references)
@@ -184,8 +183,8 @@ func (c *RedisCache) checkOpened(correlationId string) (state bool, err error) {
 // Retrieve method are retrieves cached value from the cache using its key.
 // If value is missing in the cache or expired it returns nil.
 // Parameters:
-//  - correlationId     (optional) transaction id to trace execution through call chain.
-//  - key               a unique value key.
+//   - correlationId     (optional) transaction id to trace execution through call chain.
+//   - key               a unique value key.
 //  Retruns: cached value or error.
 func (c *RedisCache) Retrieve(correlationId string, key string) (value interface{}, err error) {
 	state, err := c.checkOpened(correlationId)
@@ -197,10 +196,10 @@ func (c *RedisCache) Retrieve(correlationId string, key string) (value interface
 
 // Store method are stores value in the cache with expiration time.
 // Parameters:
-// - correlationId     (optional) transaction id to trace execution through call chain.
-// - key               a unique value key.
-// - value             a value to store.
-// - timeout           expiration timeout in milliseconds.
+//   - correlationId     (optional) transaction id to trace execution through call chain.
+//   - key               a unique value key.
+//   - value             a value to store.
+//   - timeout           expiration timeout in milliseconds.
 // Retruns error or nil for success
 func (c *RedisCache) Store(correlationId string, key string, value interface{}, timeout int64) (result interface{}, err error) {
 	state, err := c.checkOpened(correlationId)
@@ -213,8 +212,8 @@ func (c *RedisCache) Store(correlationId string, key string, value interface{}, 
 
 // Removes a value from the cache by its key.
 // Parameters:
-// - correlationId     (optional) transaction id to trace execution through call chain.
-// - key               a unique value key.
+//   - correlationId     (optional) transaction id to trace execution through call chain.
+//   - key               a unique value key.
 // Returns: error or nil for success
 func (c *RedisCache) Remove(correlationId string, key string) error {
 	state, err := c.checkOpened(correlationId)

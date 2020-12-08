@@ -19,19 +19,19 @@ RedisLock are distributed lock that is implemented based on Redis in-memory data
 
 Configuration parameters:
 
-- connection(s):
-  - discovery_key:         (optional) a key to retrieve the connection from IDiscovery
-  - host:                  host name or IP address
-  - port:                  port number
-  - uri:                   resource URI or connection string with all parameters in it
-- credential(s):
-  - store_key:             key to retrieve parameters from credential store
-  //- username:              user name (currently is not used)
-  - password:              user password
-- options:
-  - retrytimeout:         timeout in milliseconds to retry lock acquisition. (Default: 100)
-  //- retries:               number of retries (default: 3)
-  - db_num:                database number in Redis  (default 0)
+  - connection(s):
+    - discovery_key:         (optional) a key to retrieve the connection from IDiscovery
+    - host:                  host name or IP address
+    - port:                  port number
+    - uri:                   resource URI or connection string with all parameters in it
+  - credential(s):
+    - store_key:             key to retrieve parameters from credential store
+    - username:              user name (currently is not used)
+    - password:              user password
+  - options:
+    - retrytimeout:         timeout in milliseconds to retry lock acquisition. (Default: 100)
+    - retries:               number of retries (default: 3)
+    - db_num:                database number in Redis  (default 0)
 
 References:
 
@@ -50,11 +50,11 @@ Example:
       ...
 
     result, err := lock.TryAcquireLock("123", "key1", 3000)
-	if result {
-		// Processing...
-	}
-	err = lock.ReleaseLock("123", "key1")
-	// Continue...
+    if result {
+    	// Processing...
+    }
+    err = lock.ReleaseLock("123", "key1")
+    // Continue...
 */
 type RedisLock struct {
 	*clock.Lock
