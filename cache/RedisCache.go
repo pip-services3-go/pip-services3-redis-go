@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"encoding/json"
 	"strconv"
 	"time"
 
@@ -191,7 +192,45 @@ func (c *RedisCache) Retrieve(correlationId string, key string) (value interface
 	if !state {
 		return nil, err
 	}
-	return c.client.Do("GET", key)
+	item, err := c.client.Do("GET", key)
+	if err != nil {
+		return nil, err
+	}
+	if item != nil {
+		var val interface{}
+		err = json.Unmarshal((item).([]byte), &val)
+		if err != nil {
+			return nil, err
+		}
+		return val, nil
+	}
+	return nil, nil
+}
+
+// Retrive cached value from the cache using its key and restore into reference object. If value is missing in the cache or expired it returns false.
+// Parameters:
+//   - correlationId string
+//   transaction id to trace execution through call chain.
+//   - key string   a unique value key.
+//   - refObj       pointer to object for restore
+// Returns bool, error
+func (c *RedisCache) RetrieveAs(correlationId string, key string, refObj interface{}) (bool, error) {
+	state, err := c.checkOpened(correlationId)
+	if !state {
+		return false, err
+	}
+	item, err := c.client.Do("GET", key)
+	if err != nil {
+		return false, err
+	}
+	if item != nil {
+		err = json.Unmarshal((item).([]byte), refObj)
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	return false, nil
 }
 
 // Store method are stores value in the cache with expiration time.
@@ -207,7 +246,12 @@ func (c *RedisCache) Store(correlationId string, key string, value interface{}, 
 		return nil, err
 	}
 
-	return c.client.Do("SET", key, value, "PX", timeout)
+	jsonVal, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+	_, err = c.client.Do("SET", key, jsonVal, "PX", timeout)
+	return value, err
 }
 
 // Removes a value from the cache by its key.

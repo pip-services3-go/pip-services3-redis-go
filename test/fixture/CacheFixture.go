@@ -27,35 +27,33 @@ func NewCacheFixture(cache ccache.ICache) *CacheFixture {
 
 func (c *CacheFixture) TestStoreAndRetrieve(t *testing.T) {
 
-	_, err := c.cache.Store("", KEY1, []byte(VALUE1), 5000)
+	_, err := c.cache.Store("", KEY1, VALUE1, 5000)
 	assert.Nil(t, err)
 
-	_, err = c.cache.Store("", KEY2, []byte(VALUE2), 5000)
+	_, err = c.cache.Store("", KEY2, VALUE2, 5000)
 	assert.Nil(t, err)
 
 	select {
 	case <-time.After(500 * time.Millisecond):
 	}
 
-	res, err := c.cache.Retrieve("", KEY1)
-	val, _ := res.([]byte)
+	val, err := c.cache.Retrieve("", KEY1)
 
 	assert.Nil(t, err)
-	assert.NotNil(t, res)
-	assert.Equal(t, VALUE1, string(val))
+	assert.NotNil(t, val)
+	assert.Equal(t, VALUE1, val)
 
-	res, err = c.cache.Retrieve("", KEY2)
-	val, _ = res.([]byte)
-
+	var str string
+	ok, err := c.cache.RetrieveAs("", KEY2, &str)
+	assert.True(t, ok)
 	assert.Nil(t, err)
-	assert.NotNil(t, res)
-	assert.Equal(t, VALUE2, string(val))
+	assert.Equal(t, VALUE2, str)
 
 }
 
 func (c *CacheFixture) TestRetrieveExpired(t *testing.T) {
 
-	_, err := c.cache.Store("", KEY1, []byte(VALUE1), 1000)
+	_, err := c.cache.Store("", KEY1, VALUE1, 1000)
 	assert.Nil(t, err)
 
 	select {
@@ -66,11 +64,17 @@ func (c *CacheFixture) TestRetrieveExpired(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Nil(t, val)
 
+	var str string
+	ok, err := c.cache.RetrieveAs("", KEY1, &str)
+	assert.False(t, ok)
+	assert.Nil(t, err)
+	assert.Equal(t, str, "")
+
 }
 
 func (c *CacheFixture) TestRemove(t *testing.T) {
 
-	_, err := c.cache.Store("", KEY1, []byte(VALUE1), 1000)
+	_, err := c.cache.Store("", KEY1, VALUE1, 1000)
 	assert.Nil(t, err)
 
 	err = c.cache.Remove("", KEY1)
@@ -79,4 +83,10 @@ func (c *CacheFixture) TestRemove(t *testing.T) {
 	val, err := c.cache.Retrieve("", KEY1)
 	assert.Nil(t, err)
 	assert.Nil(t, val)
+
+	var str string
+	ok, err := c.cache.RetrieveAs("", KEY1, &str)
+	assert.False(t, ok)
+	assert.Nil(t, err)
+	assert.Equal(t, str, "")
 }
