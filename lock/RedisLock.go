@@ -71,7 +71,7 @@ type RedisLock struct {
 
 // NewRedisLock method are creates a new instance of this lock.
 func NewRedisLock() *RedisLock {
-	c := RedisLock{
+	c := &RedisLock{
 		connectionResolver: ccon.NewEmptyConnectionResolver(),
 		credentialResolver: cauth.NewEmptyCredentialResolver(),
 		lockId:             cdata.IdGenerator.NextLong(),
@@ -80,8 +80,8 @@ func NewRedisLock() *RedisLock {
 		dbNum:  0,
 		client: nil,
 	}
-	c.Lock = clock.InheritLock(&c)
-	return &c
+	c.Lock = clock.InheritLock(c)
+	return c
 }
 
 // Configure method are configures component by passing configuration parameters.

@@ -10,6 +10,7 @@ import (
 	cref "github.com/pip-services3-go/pip-services3-commons-go/refer"
 	cauth "github.com/pip-services3-go/pip-services3-components-go/auth"
 	ccon "github.com/pip-services3-go/pip-services3-components-go/connect"
+	ccache "github.com/pip-services3-go/pip-services3-components-go/cache"
 
 	redis "github.com/gomodule/redigo/redis"
 )
@@ -69,6 +70,8 @@ type RedisCache struct {
 
 	client redis.Conn
 }
+
+_ = (&RedisCache).(ccache.ICache)
 
 // NewRedisCache method are creates a new instance of this cache.
 func NewRedisCache() *RedisCache {
@@ -212,9 +215,9 @@ func (c *RedisCache) Retrieve(correlationId string, key string) (value interface
 //   - correlationId string
 //   transaction id to trace execution through call chain.
 //   - key string   a unique value key.
-//   - refObj       pointer to object for restore
+//   - result       pointer to object for restore
 // Returns bool, error
-func (c *RedisCache) RetrieveAs(correlationId string, key string, refObj interface{}) (bool, error) {
+func (c *RedisCache) RetrieveAs(correlationId string, key string, result interface{}) (bool, error) {
 	state, err := c.checkOpened(correlationId)
 	if !state {
 		return false, err
@@ -224,7 +227,7 @@ func (c *RedisCache) RetrieveAs(correlationId string, key string, refObj interfa
 		return false, err
 	}
 	if item != nil {
-		err = json.Unmarshal((item).([]byte), refObj)
+		err = json.Unmarshal((item).([]byte), result)
 		if err != nil {
 			return false, err
 		}
