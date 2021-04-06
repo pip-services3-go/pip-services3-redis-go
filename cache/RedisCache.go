@@ -10,7 +10,6 @@ import (
 	cref "github.com/pip-services3-go/pip-services3-commons-go/refer"
 	cauth "github.com/pip-services3-go/pip-services3-components-go/auth"
 	ccon "github.com/pip-services3-go/pip-services3-components-go/connect"
-	ccache "github.com/pip-services3-go/pip-services3-components-go/cache"
 
 	redis "github.com/gomodule/redigo/redis"
 )
@@ -70,8 +69,6 @@ type RedisCache struct {
 
 	client redis.Conn
 }
-
-_ = (&RedisCache).(ccache.ICache)
 
 // NewRedisCache method are creates a new instance of this cache.
 func NewRedisCache() *RedisCache {
@@ -216,24 +213,24 @@ func (c *RedisCache) Retrieve(correlationId string, key string) (value interface
 //   transaction id to trace execution through call chain.
 //   - key string   a unique value key.
 //   - result       pointer to object for restore
-// Returns bool, error
-func (c *RedisCache) RetrieveAs(correlationId string, key string, result interface{}) (bool, error) {
+// Returns interface{}, error
+func (c *RedisCache) RetrieveAs(correlationId string, key string, result interface{}) (interface{}, error) {
 	state, err := c.checkOpened(correlationId)
 	if !state {
-		return false, err
+		return nil, err
 	}
 	item, err := c.client.Do("GET", key)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	if item != nil {
 		err = json.Unmarshal((item).([]byte), result)
 		if err != nil {
-			return false, err
+			return nil, err
 		}
-		return true, nil
+		return result, nil
 	}
-	return false, nil
+	return nil, nil
 }
 
 // Store method are stores value in the cache with expiration time.
@@ -249,11 +246,24 @@ func (c *RedisCache) Store(correlationId string, key string, value interface{}, 
 		return nil, err
 	}
 
-	jsonVal, err := json.Marshal(value)
+	var val interface{}
+
+	switch v := value.(type) {
+	case []byte:
+		val = v
+		break
+	case string:
+		val, err = json.Marshal(value)
+		break
+	default:
+		val, err = json.Marshal(value)
+		break
+	}
+
 	if err != nil {
 		return nil, err
 	}
-	_, err = c.client.Do("SET", key, jsonVal, "PX", timeout)
+	_, err = c.client.Do("SET", key, val, "PX", timeout)
 	return value, err
 }
 
