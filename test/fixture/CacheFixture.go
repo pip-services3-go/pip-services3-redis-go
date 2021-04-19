@@ -66,7 +66,7 @@ func (c *CacheFixture) TestRetrieveExpired(t *testing.T) {
 
 	var str string
 	result, err := c.cache.RetrieveAs("", KEY1, &str)
-	assert.Nil(t, result)
+	assert.False(t, result.(bool))
 	assert.Nil(t, err)
 
 }
@@ -85,6 +85,6 @@ func (c *CacheFixture) TestRemove(t *testing.T) {
 
 	var str string
 	result, err := c.cache.RetrieveAs("", KEY1, &str)
-	assert.Nil(t, result)
+	assert.False(t, result.(bool))
 	assert.Nil(t, err)
 }

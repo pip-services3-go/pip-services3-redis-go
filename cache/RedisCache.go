@@ -1,17 +1,17 @@
-package cache
+package persistence
 
 import (
 	"encoding/json"
-	"strconv"
-	"time"
+	"math/rand"
 
+	"github.com/go-redis/redis"
 	cconf "github.com/pip-services3-go/pip-services3-commons-go/config"
 	cerr "github.com/pip-services3-go/pip-services3-commons-go/errors"
 	cref "github.com/pip-services3-go/pip-services3-commons-go/refer"
 	cauth "github.com/pip-services3-go/pip-services3-components-go/auth"
 	ccon "github.com/pip-services3-go/pip-services3-components-go/connect"
-
-	redis "github.com/gomodule/redigo/redis"
+	"strconv"
+	"time"
 )
 
 /*
@@ -32,7 +32,8 @@ Configuration parameters:
     - retries:               number of retries (default: 3)
     - timeout:               default caching timeout in milliseconds (default: 1 minute)
     - db_num:                database number in Redis  (default 0)
-    - max_size:            maximum number of values stored in this cache (default: 1000)
+    - max_size:            	 maximum number of values stored in this cache (default: 1000)
+    - cluster:            	 enable redis cluster
 
 References:
 
@@ -65,9 +66,10 @@ type RedisCache struct {
 
 	timeout int
 	//retries int
-	dbNum int
+	dbNum     int
+	isCluster bool
 
-	client redis.Conn
+	client redis.UniversalClient
 }
 
 // NewRedisCache method are creates a new instance of this cache.
@@ -93,6 +95,7 @@ func (c *RedisCache) Configure(config *cconf.ConfigParams) {
 	if c.dbNum > 15 || c.dbNum < 0 {
 		c.dbNum = 0
 	}
+	c.isCluster = config.GetAsBooleanWithDefault("options.cluster", c.isCluster)
 }
 
 // Sets references to dependent components.
@@ -113,8 +116,11 @@ func (c *RedisCache) IsOpen() bool {
 //  - correlationId 	(optional) transaction id to trace execution through call chain.
 // Returns: error or nil no errors occured.
 func (c *RedisCache) Open(correlationId string) error {
-	var connection *ccon.ConnectionParams
-	var credential *cauth.CredentialParams
+	var (
+		connection *ccon.ConnectionParams
+		credential *cauth.CredentialParams
+		options    redis.Options
+	)
 
 	connection, err := c.connectionResolver.Resolve(correlationId)
 
@@ -127,33 +133,39 @@ func (c *RedisCache) Open(correlationId string) error {
 	if err != nil {
 		return err
 	}
-
-	var url, host, port, password string
-	var dialOpts []redis.DialOption = make([]redis.DialOption, 0)
-
-	dialOpts = append(dialOpts, redis.DialConnectTimeout(time.Duration(c.timeout)*time.Millisecond))
-	dialOpts = append(dialOpts, redis.DialDatabase(c.dbNum))
+	options.DialTimeout = time.Duration(rand.Intn(c.timeout)) * time.Millisecond
+	options.DB = c.dbNum
 
 	if credential != nil {
-		password = credential.Password()
-		dialOpts = append(dialOpts, redis.DialPassword(password))
+		options.Password = credential.Password()
 	}
 
 	if connection.Uri() != "" {
-		url = connection.Uri()
-		c.client, err = redis.DialURL(url, dialOpts...)
+		options.Addr = connection.Uri()
 	} else {
-		host = connection.Host()
+		host := connection.Host()
 		if host == "" {
 			host = "localhost"
 		}
-		port = strconv.FormatInt(int64(connection.Port()), 10)
+		port := strconv.FormatInt(int64(connection.Port()), 10)
 		if port == "0" {
 			port = "6379"
 		}
-		url = host + ":" + port
-		c.client, err = redis.Dial("tcp", url, dialOpts...)
+		options.Addr = host + ":" + port
 	}
+	if c.isCluster {
+		c.client = redis.NewClusterClient(&redis.ClusterOptions{
+			OnNewNode: func(client *redis.Client) {
+				client = redis.NewClient(&options)
+			},
+			Addrs:       append([]string{}, options.Addr),
+			Password:    options.Password,
+			DialTimeout: options.DialTimeout,
+		})
+	} else {
+		c.client = redis.NewClient(&options)
+	}
+	_, err = c.client.Ping().Result()
 	return err
 }
 
@@ -192,13 +204,16 @@ func (c *RedisCache) Retrieve(correlationId string, key string) (value interface
 	if !state {
 		return nil, err
 	}
-	item, err := c.client.Do("GET", key)
+	item, err := c.client.Get(key).Bytes()
 	if err != nil {
+		if err == redis.Nil {
+			return nil, nil
+		}
 		return nil, err
 	}
 	if item != nil {
 		var val interface{}
-		err = json.Unmarshal((item).([]byte), &val)
+		err = json.Unmarshal(item, &val)
 		if err != nil {
 			return nil, err
 		}
@@ -212,25 +227,28 @@ func (c *RedisCache) Retrieve(correlationId string, key string) (value interface
 //   - correlationId string
 //   transaction id to trace execution through call chain.
 //   - key string   a unique value key.
-//   - result       pointer to object for restore
-// Returns interface{}, error
-func (c *RedisCache) RetrieveAs(correlationId string, key string, result interface{}) (interface{}, error) {
+//   - refObj       pointer to object for restore
+// Returns bool, error
+func (c *RedisCache) RetrieveAs(correlationId string, key string, refObj interface{}) (interface{}, error) {
 	state, err := c.checkOpened(correlationId)
 	if !state {
-		return nil, err
+		return false, err
 	}
-	item, err := c.client.Do("GET", key)
+	item, err := c.client.Get(key).Bytes()
 	if err != nil {
-		return nil, err
+		if err == redis.Nil {
+			return false, nil
+		}
+		return false, err
 	}
 	if item != nil {
-		err = json.Unmarshal((item).([]byte), result)
+		err = json.Unmarshal(item, refObj)
 		if err != nil {
-			return nil, err
+			return false, err
 		}
-		return result, nil
+		return true, nil
 	}
-	return nil, nil
+	return false, nil
 }
 
 // Store method are stores value in the cache with expiration time.
@@ -246,25 +264,12 @@ func (c *RedisCache) Store(correlationId string, key string, value interface{}, 
 		return nil, err
 	}
 
-	var val interface{}
-
-	switch v := value.(type) {
-	case []byte:
-		val = v
-		break
-	case string:
-		val, err = json.Marshal(value)
-		break
-	default:
-		val, err = json.Marshal(value)
-		break
-	}
-
+	jsonVal, err := json.Marshal(value)
 	if err != nil {
 		return nil, err
 	}
-	_, err = c.client.Do("SET", key, val, "PX", timeout)
-	return value, err
+	tmout := time.Duration(rand.Int63n(timeout)) * time.Millisecond
+	return value, c.client.Set(key, jsonVal, tmout).Err()
 }
 
 // Removes a value from the cache by its key.
@@ -277,6 +282,5 @@ func (c *RedisCache) Remove(correlationId string, key string) error {
 	if !state {
 		return err
 	}
-	_, err = c.client.Do("DEL", key)
-	return err
+	return c.client.Del(key).Err()
 }
