@@ -232,23 +232,23 @@ func (c *RedisCache) Retrieve(correlationId string, key string) (value interface
 func (c *RedisCache) RetrieveAs(correlationId string, key string, refObj interface{}) (interface{}, error) {
 	state, err := c.checkOpened(correlationId)
 	if !state {
-		return false, err
+		return nil, err
 	}
 	item, err := c.client.Get(key).Bytes()
 	if err != nil {
 		if err == redis.Nil {
-			return false, nil
+			return nil, nil
 		}
-		return false, err
+		return nil, err
 	}
 	if item != nil {
 		err = json.Unmarshal(item, refObj)
 		if err != nil {
-			return false, err
+			return nil, err
 		}
-		return true, nil
+		return refObj, nil
 	}
-	return false, nil
+	return nil, nil
 }
 
 // Store method are stores value in the cache with expiration time.
