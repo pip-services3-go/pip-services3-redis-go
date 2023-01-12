@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#375EAB">
 
-  <title>cache - Go Documentation Server</title>
+  <title>persistence - Go Documentation Server</title>
 
 <link type="text/css" rel="stylesheet" href="../../lib/godoc/style.css">
 
@@ -14,7 +14,7 @@
 
 
 
-<script>var goVersion = "go1.13.15";</script>
+<script>var goVersion = "go1.16.15";</script>
 <script src="../../lib/godoc/godocs.js" defer></script>
 </head>
 <body>
@@ -43,7 +43,7 @@
 
 
   <h1>
-    Package cache
+    Package persistence
     <span class="text-muted"></span>
   </h1>
 
@@ -138,6 +138,9 @@
 					<dd>&nbsp; &nbsp; <a href="index.html#RedisCache.Retrieve">func (c *RedisCache) Retrieve(correlationId string, key string) (value interface{}, err error)</a></dd>
 				
 					
+					<dd>&nbsp; &nbsp; <a href="index.html#RedisCache.RetrieveAs">func (c *RedisCache) RetrieveAs(correlationId string, key string, refObj interface{}) (interface{}, error)</a></dd>
+				
+					
 					<dd>&nbsp; &nbsp; <a href="index.html#RedisCache.SetReferences">func (c *RedisCache) SetReferences(references cref.IReferences)</a></dd>
 				
 					
@@ -171,7 +174,7 @@
 		
 			
 			
-			<h2 id="RedisCache">type <a href="http://localhost:6060/src/cache/RedisCache.go?s=1932:2109#L51">RedisCache</a>
+			<h2 id="RedisCache">type <a href="http://localhost:6060/src/cache/RedisCache.go?s=2067:2285#L53">RedisCache</a>
 				<a class="permalink" href="index.html#RedisCache">&#xb6;</a>
 				
 				
@@ -195,7 +198,8 @@ Configuration parameters:
   - retries:               number of retries (default: 3)
   - timeout:               default caching timeout in milliseconds (default: 1 minute)
   - db_num:                database number in Redis  (default 0)
-  - max_size:            maximum number of values stored in this cache (default: 1000)
+  - max_size:            	 maximum number of values stored in this cache (default: 1000)
+  - cluster:            	 enable redis cluster
 </pre>
 <p>
 References:
@@ -241,7 +245,7 @@ fmt.Println(string(value))     // Result: &#34;ABC&#34;
 
 			
 				
-				<h3 id="NewRedisCache">func <a href="http://localhost:6060/src/cache/RedisCache.go?s=2177:2209#L63">NewRedisCache</a>
+				<h3 id="NewRedisCache">func <a href="http://localhost:6060/src/cache/RedisCache.go?s=2356:2388#L66">NewRedisCache</a>
 					<a class="permalink" href="index.html#NewRedisCache">&#xb6;</a>
 					
 					
@@ -257,7 +261,7 @@ NewRedisCache method are creates a new instance of this cache.
 
 			
 				
-				<h3 id="RedisCache.Close">func (*RedisCache) <a href="http://localhost:6060/src/cache/RedisCache.go?s=5010:5064#L153">Close</a>
+				<h3 id="RedisCache.Close">func (*RedisCache) <a href="http://localhost:6060/src/cache/RedisCache.go?s=5481:5535#L166">Close</a>
 					<a class="permalink" href="index.html#RedisCache.Close">&#xb6;</a>
 					
 					
@@ -278,7 +282,7 @@ Retruns: error or nil no errors occured.
 				
 			
 				
-				<h3 id="RedisCache.Configure">func (*RedisCache) <a href="http://localhost:6060/src/cache/RedisCache.go?s=2546:2604#L75">Configure</a>
+				<h3 id="RedisCache.Configure">func (*RedisCache) <a href="http://localhost:6060/src/cache/RedisCache.go?s=2737:2795#L78">Configure</a>
 					<a class="permalink" href="index.html#RedisCache.Configure">&#xb6;</a>
 					
 					
@@ -295,7 +299,7 @@ Configure method are configures component by passing configuration parameters.
 				
 			
 				
-				<h3 id="RedisCache.IsOpen">func (*RedisCache) <a href="http://localhost:6060/src/cache/RedisCache.go?s=3346:3380#L96">IsOpen</a>
+				<h3 id="RedisCache.IsOpen">func (*RedisCache) <a href="http://localhost:6060/src/cache/RedisCache.go?s=3637:3671#L100">IsOpen</a>
 					<a class="permalink" href="index.html#RedisCache.IsOpen">&#xb6;</a>
 					
 					
@@ -311,7 +315,7 @@ Returns true if the component has been opened and false otherwise.
 				
 			
 				
-				<h3 id="RedisCache.Open">func (*RedisCache) <a href="http://localhost:6060/src/cache/RedisCache.go?s=3595:3648#L104">Open</a>
+				<h3 id="RedisCache.Open">func (*RedisCache) <a href="http://localhost:6060/src/cache/RedisCache.go?s=3894:3947#L108">Open</a>
 					<a class="permalink" href="index.html#RedisCache.Open">&#xb6;</a>
 					
 					
@@ -332,7 +336,7 @@ Returns: error or nil no errors occured.
 				
 			
 				
-				<h3 id="RedisCache.Remove">func (*RedisCache) <a href="http://localhost:6060/src/cache/RedisCache.go?s=6812:6879#L208">Remove</a>
+				<h3 id="RedisCache.Remove">func (*RedisCache) <a href="http://localhost:6060/src/cache/RedisCache.go?s=8592:8659#L270">Remove</a>
 					<a class="permalink" href="index.html#RedisCache.Remove">&#xb6;</a>
 					
 					
@@ -354,7 +358,7 @@ Returns: error or nil for success
 				
 			
 				
-				<h3 id="RedisCache.Retrieve">func (*RedisCache) <a href="http://localhost:6060/src/cache/RedisCache.go?s=5746:5840#L179">Retrieve</a>
+				<h3 id="RedisCache.Retrieve">func (*RedisCache) <a href="http://localhost:6060/src/cache/RedisCache.go?s=6243:6337#L192">Retrieve</a>
 					<a class="permalink" href="index.html#RedisCache.Retrieve">&#xb6;</a>
 					
 					
@@ -375,7 +379,31 @@ Retruns: cached value or error.
 				
 			
 				
-				<h3 id="RedisCache.SetReferences">func (*RedisCache) <a href="http://localhost:6060/src/cache/RedisCache.go?s=3073:3136#L89">SetReferences</a>
+				<h3 id="RedisCache.RetrieveAs">func (*RedisCache) <a href="http://localhost:6060/src/cache/RedisCache.go?s=7095:7201#L222">RetrieveAs</a>
+					<a class="permalink" href="index.html#RedisCache.RetrieveAs">&#xb6;</a>
+					
+					
+				</h3>
+				<pre>func (c *<a href="index.html#RedisCache">RedisCache</a>) RetrieveAs(correlationId <a href="http://localhost:6060/pkg/builtin/#string">string</a>, key <a href="http://localhost:6060/pkg/builtin/#string">string</a>, refObj interface{}) (interface{}, <a href="http://localhost:6060/pkg/builtin/#error">error</a>)</pre>
+				<p>
+Retrive cached value from the cache using its key and restore into reference object. If value is missing in the cache or expired it returns false.
+Parameters:
+</p>
+<pre>- correlationId string
+transaction id to trace execution through call chain.
+- key string   a unique value key.
+- refObj       pointer to object for restore
+</pre>
+<p>
+Returns bool, error
+</p>
+
+				
+				
+				
+			
+				
+				<h3 id="RedisCache.SetReferences">func (*RedisCache) <a href="http://localhost:6060/src/cache/RedisCache.go?s=3357:3420#L93">SetReferences</a>
 					<a class="permalink" href="index.html#RedisCache.SetReferences">&#xb6;</a>
 					
 					
@@ -392,7 +420,7 @@ Sets references to dependent components.
 				
 			
 				
-				<h3 id="RedisCache.Store">func (*RedisCache) <a href="http://localhost:6060/src/cache/RedisCache.go?s=6314:6440#L194">Store</a>
+				<h3 id="RedisCache.Store">func (*RedisCache) <a href="http://localhost:6060/src/cache/RedisCache.go?s=7934:8060#L251">Store</a>
 					<a class="permalink" href="index.html#RedisCache.Store">&#xb6;</a>
 					
 					
@@ -427,13 +455,13 @@ Retruns error or nil for success
 
 
 <div id="footer">
-Build version go1.13.15.<br>
+Build version go1.16.15.<br>
 Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
 the content of this page is licensed under the
 Creative Commons Attribution 3.0 License,
 and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
-<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> |
-<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+<a href="https://golang.org/doc/tos.html">Terms of Service</a> |
+<a href="https://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
 </div>
 
 </div><!-- .container -->

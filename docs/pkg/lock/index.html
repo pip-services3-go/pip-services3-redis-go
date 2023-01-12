@@ -14,7 +14,7 @@
 
 
 
-<script>var goVersion = "go1.13.15";</script>
+<script>var goVersion = "go1.16.15";</script>
 <script src="../../lib/godoc/godocs.js" defer></script>
 </head>
 <body>
@@ -168,7 +168,7 @@
 		
 			
 			
-			<h2 id="RedisLock">type <a href="http://localhost:6060/src/lock/RedisLock.go?s=1939:2144#L49">RedisLock</a>
+			<h2 id="RedisLock">type <a href="http://localhost:6060/src/lock/RedisLock.go?s=1997:2213#L49">RedisLock</a>
 				<a class="permalink" href="index.html#RedisLock">&#xb6;</a>
 				
 				
@@ -236,7 +236,7 @@ err = lock.ReleaseLock(&#34;123&#34;, &#34;key1&#34;)
 
 			
 				
-				<h3 id="NewRedisLock">func <a href="http://localhost:6060/src/lock/RedisLock.go?s=2210:2240#L63">NewRedisLock</a>
+				<h3 id="NewRedisLock">func <a href="http://localhost:6060/src/lock/RedisLock.go?s=2282:2312#L63">NewRedisLock</a>
 					<a class="permalink" href="index.html#NewRedisLock">&#xb6;</a>
 					
 					
@@ -252,7 +252,7 @@ NewRedisLock method are creates a new instance of this lock.
 
 			
 				
-				<h3 id="RedisLock.Close">func (*RedisLock) <a href="http://localhost:6060/src/lock/RedisLock.go?s=5217:5270#L159">Close</a>
+				<h3 id="RedisLock.Close">func (*RedisLock) <a href="http://localhost:6060/src/lock/RedisLock.go?s=5384:5437#L159">Close</a>
 					<a class="permalink" href="index.html#RedisLock.Close">&#xb6;</a>
 					
 					
@@ -273,7 +273,7 @@ Retruns: error or nil no errors occured.
 				
 			
 				
-				<h3 id="RedisLock.Configure">func (*RedisLock) <a href="http://localhost:6060/src/lock/RedisLock.go?s=2700:2757#L80">Configure</a>
+				<h3 id="RedisLock.Configure">func (*RedisLock) <a href="http://localhost:6060/src/lock/RedisLock.go?s=2788:2845#L80">Configure</a>
 					<a class="permalink" href="index.html#RedisLock.Configure">&#xb6;</a>
 					
 					
@@ -291,7 +291,7 @@ Parameters:
 				
 			
 				
-				<h3 id="RedisLock.IsOpen">func (*RedisLock) <a href="http://localhost:6060/src/lock/RedisLock.go?s=3556:3589#L102">IsOpen</a>
+				<h3 id="RedisLock.IsOpen">func (*RedisLock) <a href="http://localhost:6060/src/lock/RedisLock.go?s=3666:3699#L102">IsOpen</a>
 					<a class="permalink" href="index.html#RedisLock.IsOpen">&#xb6;</a>
 					
 					
@@ -307,7 +307,7 @@ Returns true if the component has been opened and false otherwise.
 				
 			
 				
-				<h3 id="RedisLock.Open">func (*RedisLock) <a href="http://localhost:6060/src/lock/RedisLock.go?s=3804:3856#L110">Open</a>
+				<h3 id="RedisLock.Open">func (*RedisLock) <a href="http://localhost:6060/src/lock/RedisLock.go?s=3922:3974#L110">Open</a>
 					<a class="permalink" href="index.html#RedisLock.Open">&#xb6;</a>
 					
 					
@@ -328,7 +328,7 @@ Returns: error or nil no errors occured.
 				
 			
 				
-				<h3 id="RedisLock.ReleaseLock">func (*RedisLock) <a href="http://localhost:6060/src/lock/RedisLock.go?s=6639:6710#L203">ReleaseLock</a>
+				<h3 id="RedisLock.ReleaseLock">func (*RedisLock) <a href="http://localhost:6060/src/lock/RedisLock.go?s=6850:6921#L203">ReleaseLock</a>
 					<a class="permalink" href="index.html#RedisLock.ReleaseLock">&#xb6;</a>
 					
 					
@@ -349,7 +349,7 @@ Returns: error or nil for success.
 				
 			
 				
-				<h3 id="RedisLock.SetReferences">func (*RedisLock) <a href="http://localhost:6060/src/lock/RedisLock.go?s=3266:3328#L95">SetReferences</a>
+				<h3 id="RedisLock.SetReferences">func (*RedisLock) <a href="http://localhost:6060/src/lock/RedisLock.go?s=3369:3431#L95">SetReferences</a>
 					<a class="permalink" href="index.html#RedisLock.SetReferences">&#xb6;</a>
 					
 					
@@ -367,7 +367,7 @@ Parameters:
 				
 			
 				
-				<h3 id="RedisLock.TryAcquireLock">func (*RedisLock) <a href="http://localhost:6060/src/lock/RedisLock.go?s=6030:6134#L186">TryAcquireLock</a>
+				<h3 id="RedisLock.TryAcquireLock">func (*RedisLock) <a href="http://localhost:6060/src/lock/RedisLock.go?s=6224:6328#L186">TryAcquireLock</a>
 					<a class="permalink" href="index.html#RedisLock.TryAcquireLock">&#xb6;</a>
 					
 					
@@ -402,13 +402,13 @@ Returns: a lock result or error.
 
 
 <div id="footer">
-Build version go1.13.15.<br>
+Build version go1.16.15.<br>
 Except as <a href="https://developers.google.com/site-policies#restrictions">noted</a>,
 the content of this page is licensed under the
 Creative Commons Attribution 3.0 License,
 and code is licensed under a <a href="http://localhost:6060/LICENSE">BSD license</a>.<br>
-<a href="http://localhost:6060/doc/tos.html">Terms of Service</a> |
-<a href="http://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
+<a href="https://golang.org/doc/tos.html">Terms of Service</a> |
+<a href="https://www.google.com/intl/en/policies/privacy/">Privacy Policy</a>
 </div>
 
 </div><!-- .container -->
